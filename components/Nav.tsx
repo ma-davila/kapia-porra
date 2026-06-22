@@ -1,5 +1,7 @@
 import Link from "next/link";
+import Image from "next/image";
 import { getSession } from "@/lib/session";
+import logo from "@/public/logo.png";
 
 const links = [
   { href: "/", label: "Groups" },
@@ -14,9 +16,11 @@ export default async function Nav() {
   return (
     <header className="border-b border-slate-200 bg-white">
       <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-2 px-4 py-3">
-        <Link href="/" className="flex items-center gap-2 text-lg font-bold text-pitch">
-          <span>⚽</span>
-          <span>Kapia&apos;s World Cup Porra</span>
+        <Link href="/" className="flex items-center gap-2.5 font-bold text-slate-900">
+          <Image src={logo} alt="Kapia World Cup Porra" width={40} height={40} className="h-10 w-10 rounded-md" priority />
+          <span className="text-lg leading-tight">
+            Kapia&apos;s World Cup <span className="text-kapia">Porra</span>
+          </span>
         </Link>
         {session && (
           <nav className="flex flex-wrap items-center gap-1 text-sm">
