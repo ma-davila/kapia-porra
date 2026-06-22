@@ -6,6 +6,8 @@ export type ApiResult = {
   apiId: number;
   utcDate: string; // ISO
   finished: boolean;
+  isGroup: boolean; // group stage vs knockout
+  stage: string; // raw API stage, e.g. GROUP_STAGE, LAST_16, FINAL
   homeCode: string | null;
   awayCode: string | null;
   homeScore: number | null;
@@ -79,11 +81,14 @@ export function codeForName(name: string | undefined | null): string | null {
   return NAME_TO_CODE[normalize(name)] ?? null;
 }
 
-// Fetch World Cup matches in [dateFrom, dateTo] (YYYY-MM-DD). Returns [] if no key.
-export async function fetchResults(dateFrom: string, dateTo: string): Promise<ApiResult[]> {
+// Fetch ALL World Cup matches (group + knockout, played + upcoming). Returns []
+// if no key. We fetch the whole competition so that, once the group stage ends,
+// the knockout fixtures (now carrying real team names) are picked up and the
+// bracket fills in automatically.
+export async function fetchMatches(): Promise<ApiResult[]> {
   const key = process.env.FOOTBALL_API_KEY;
   if (!key) return [];
-  const url = `https://api.football-data.org/v4/competitions/WC/matches?dateFrom=${dateFrom}&dateTo=${dateTo}`;
+  const url = `https://api.football-data.org/v4/competitions/WC/matches`;
   const res = await fetch(url, {
     headers: { "X-Auth-Token": key },
     cache: "no-store",
@@ -94,10 +99,13 @@ export async function fetchResults(dateFrom: string, dateTo: string): Promise<Ap
   const data = (await res.json()) as { matches?: any[] };
   const out: ApiResult[] = [];
   for (const m of data.matches ?? []) {
+    const stage = String(m.stage ?? "");
     out.push({
       apiId: m.id,
       utcDate: m.utcDate,
       finished: m.status === "FINISHED",
+      isGroup: stage === "GROUP_STAGE" || m.group != null,
+      stage,
       homeCode: codeForName(m.homeTeam?.name),
       awayCode: codeForName(m.awayTeam?.name),
       homeScore: m.score?.fullTime?.home ?? null,

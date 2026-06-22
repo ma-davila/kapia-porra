@@ -57,8 +57,9 @@ password, enters the invite code once, and starts predicting.
 - **Cron `/api/cron`** (daily, automatic): fetches recent scores from football-data.org,
   updates matches, regrades predictions, and posts the Slack digest (yesterday's results +
   points each person earned + overall standings).
-- **`/admin`** (password-protected): manually fix a score, assign knockout teams as groups
-  finish, trigger a results sync, or re-post the Slack digest for a chosen date.
+- **`/admin`** (password-protected, optional fallback): manually fix a score, override a
+  knockout team assignment, trigger a results sync on demand, or re-post the Slack digest
+  for a chosen date. Day to day you shouldn't need it.
 
 ### Trigger the digest manually / from Upstash
 `/api/cron` also accepts the secret as a query param, so you can call it from Upstash QStash
@@ -83,11 +84,13 @@ npm run db:seed
 npm run dev              # http://localhost:3000
 ```
 
-## Knockout bracket
+## Knockout bracket (fully automatic)
 
 The Round-of-32 → Final fixtures are pre-loaded with their dates and placeholder slots
-("Winner Group A", etc.). As the group stage ends (June 27), assign the qualified teams in
-`/admin`; each knockout match then opens for predictions and grades like any other.
+("Winner Group A", etc.). When the group stage ends (June 27) and the football API publishes
+the real qualified teams, the daily sync **fills each bracket slot automatically** (matching
+fixtures to slots by kick-off time) and then grades scores like any other match. You don't
+need to touch anything — `/admin` is only a manual fallback if a fixture ever fails to map.
 
 ## Notes
 

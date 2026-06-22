@@ -17,8 +17,8 @@ import {
 } from "../lib/standings";
 import { buildDigestText } from "../lib/slack";
 import { scorePrediction } from "../lib/scoring";
-import { codeForName } from "../lib/football";
-import { updateResultsFromApi } from "../lib/update";
+import { codeForName, type ApiResult } from "../lib/football";
+import { updateResultsFromApi, computeUpdates } from "../lib/update";
 
 let failures = 0;
 function check(name: string, cond: boolean, detail = "") {
@@ -135,6 +135,66 @@ async function main() {
   console.log("\n[8] API update path runs without a key (no crash)");
   const upd = await updateResultsFromApi();
   check("updateResultsFromApi returns shape", typeof upd.updated === "number" && upd.fetched === 0);
+
+  console.log("\n[9] computeUpdates: group result matched by team codes");
+  // Simulate the API reporting a not-yet-played group match as finished.
+  const scheduledGroup = all.find((m) => m.stage === "group" && m.status === "scheduled")!;
+  const apiGroup: ApiResult = {
+    apiId: 900001,
+    utcDate: new Date(scheduledGroup.kickoff).toISOString(),
+    finished: true,
+    isGroup: true,
+    stage: "GROUP_STAGE",
+    homeCode: scheduledGroup.homeCode!,
+    awayCode: scheduledGroup.awayCode!,
+    homeScore: 3,
+    awayScore: 1,
+  };
+  const gUpd = computeUpdates(all, [apiGroup]);
+  check("one group update produced", gUpd.length === 1 && gUpd[0].id === scheduledGroup.id);
+  check(
+    "group score + finished set, no team reassignment",
+    gUpd[0].set.homeScore === 3 &&
+      gUpd[0].set.awayScore === 1 &&
+      gUpd[0].set.status === "finished" &&
+      gUpd[0].set.homeCode === undefined,
+  );
+
+  console.log("\n[10] computeUpdates: knockout slot auto-filled by kickoff time");
+  const r32 = all.find((m) => m.stage === "r32")!; // empty slot ("Runner-up Group A" etc.)
+  check("r32 slot starts empty", !r32.homeCode && !r32.awayCode);
+  // API now knows this knockout fixture: Spain vs Portugal, kicking off ~same time.
+  const apiKo: ApiResult = {
+    apiId: 900002,
+    utcDate: new Date(new Date(r32.kickoff).getTime() + 5 * 60000).toISOString(), // +5 min
+    finished: false,
+    isGroup: false,
+    stage: "LAST_32",
+    homeCode: "ESP",
+    awayCode: "POR",
+    homeScore: null,
+    awayScore: null,
+  };
+  const koUpd = computeUpdates(all, [apiKo]);
+  check("one knockout update produced", koUpd.length === 1 && koUpd[0].id === r32.id);
+  check(
+    "teams auto-assigned, no score yet",
+    koUpd[0].set.homeCode === "ESP" &&
+      koUpd[0].set.awayCode === "POR" &&
+      koUpd[0].set.apiFixtureId === 900002 &&
+      koUpd[0].set.status === undefined,
+  );
+  // Distant kickoff (different day) must NOT bind to a slot.
+  const apiKoFar: ApiResult = {
+    ...apiKo,
+    apiId: 900003,
+    utcDate: new Date(new Date(r32.kickoff).getTime() + 3 * 86400000).toISOString(),
+    homeCode: "BRA",
+    awayCode: "ARG",
+  };
+  const koFar = computeUpdates(all, [apiKoFar]);
+  const boundToR32 = koFar.some((u) => u.id === r32.id);
+  check("far-off fixture not bound to this slot", !boundToR32);
 
   console.log("\n--- Slack digest preview ---\n");
   console.log(text);

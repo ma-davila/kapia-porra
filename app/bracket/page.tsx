@@ -37,8 +37,8 @@ export default async function BracketPage() {
       <div className="card p-4">
         <h1 className="text-lg font-bold text-pitch">Knockout Bracket</h1>
         <p className="text-sm text-slate-500">
-          Slots fill in as groups finish (June 27). Once both teams of a match are known, it opens on
-          your <strong>Predictions</strong> page.
+          Slots fill in automatically as the groups finish (June 27). Once both teams of a match are
+          known, it opens for predictions on your <strong>Predictions</strong> page.
         </p>
       </div>
 
