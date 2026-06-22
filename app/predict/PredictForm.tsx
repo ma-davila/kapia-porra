@@ -85,7 +85,7 @@ export default function PredictForm({ matches }: { matches: EditableMatch[] }) {
         <div className="text-sm">
           {state.error && <span className="text-red-600">{state.error}</span>}
           {state.saved != null && !state.error && (
-            <span className="text-green-700">Saved {state.saved} prediction(s). ✅</span>
+            <span className="font-medium text-zinc-900">Saved {state.saved} prediction(s). ✅</span>
           )}
           {state.saved == null && !state.error && (
             <span className="text-slate-400">Fill in scores and save. Locks at kick-off.</span>

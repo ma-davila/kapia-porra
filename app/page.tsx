@@ -39,7 +39,7 @@ export default async function GroupsPage() {
                   <tr
                     key={r.team.code}
                     className={`border-b border-slate-100 last:border-0 ${
-                      i < 2 ? "bg-green-50/50" : ""
+                      i < 2 ? "bg-zinc-100" : ""
                     }`}
                   >
                     <td className="py-1.5 pl-3">

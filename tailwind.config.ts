@@ -9,8 +9,9 @@ export default {
   theme: {
     extend: {
       colors: {
-        pitch: "#0b6b3a",
-        kapia: "#16a34a",
+        // Monochrome theme — black & white.
+        pitch: "#0a0a0a", // headings / dark surfaces
+        kapia: "#171717", // buttons / accents
       },
     },
   },

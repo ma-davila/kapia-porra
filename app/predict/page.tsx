@@ -132,9 +132,9 @@ export default async function PredictPage() {
                           <span
                             className={`ml-1 rounded px-1.5 py-0.5 text-xs font-bold ${
                               pred.points === 3
-                                ? "bg-green-100 text-green-700"
+                                ? "bg-zinc-900 text-white"
                                 : pred.points === 1
-                                  ? "bg-amber-100 text-amber-700"
+                                  ? "bg-zinc-200 text-zinc-700"
                                   : "bg-slate-100 text-slate-400"
                             }`}
                           >

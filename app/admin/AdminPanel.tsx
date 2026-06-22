@@ -27,7 +27,7 @@ export type AdminMatch = {
 const empty: AdminMsg = {};
 
 function Banner({ msg }: { msg: AdminMsg }) {
-  if (msg.ok) return <p className="text-sm text-green-700">{msg.ok}</p>;
+  if (msg.ok) return <p className="text-sm font-medium text-zinc-900">{msg.ok}</p>;
   if (msg.error) return <p className="text-sm text-red-600">{msg.error}</p>;
   return null;
 }

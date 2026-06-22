@@ -38,7 +38,7 @@ export default async function LeaderboardPage() {
               <tr
                 key={r.userId}
                 className={`border-b border-slate-100 last:border-0 ${
-                  r.name === session.name ? "bg-green-50" : ""
+                  r.name === session.name ? "bg-zinc-100" : ""
                 }`}
               >
                 <td className="py-2 pl-4 font-bold text-slate-500">
