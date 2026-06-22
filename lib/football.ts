@@ -35,7 +35,7 @@ alias("BEL", "Belgium");
 alias("BIH", "Bosnia and Herzegovina", "Bosnia & Herzegovina", "Bosnia-Herzegovina");
 alias("BRA", "Brazil");
 alias("CAN", "Canada");
-alias("CPV", "Cape Verde", "Cabo Verde");
+alias("CPV", "Cape Verde", "Cabo Verde", "Cape Verde Islands");
 alias("COL", "Colombia");
 alias("CRO", "Croatia");
 alias("CUW", "Curacao", "Curaçao");
