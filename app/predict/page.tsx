@@ -1,6 +1,6 @@
 import { requireUser } from "@/lib/guard";
 import { getAllMatches, getTeams, getUserPredictions } from "@/lib/standings";
-import { madridDayLabel, madridTime } from "@/lib/dates";
+import { madridDayLabel, madridTime, isOpenForPrediction, predictionOpensAt } from "@/lib/dates";
 import { stageShort, stageLabel } from "@/lib/labels";
 import PredictForm, { type EditableMatch } from "./PredictForm";
 
@@ -15,20 +15,22 @@ export default async function PredictPage() {
   ]);
   const now = Date.now();
 
+  const nowDate = new Date();
   const editable: EditableMatch[] = [];
+  const upcoming = []; // future days, not open yet
   const past = [];
 
   for (const m of all) {
-    const kickoff = new Date(m.kickoff).getTime();
+    const kickoff = new Date(m.kickoff);
     const home = m.homeCode ? teamMap.get(m.homeCode) : null;
     const away = m.awayCode ? teamMap.get(m.awayCode) : null;
     const pred = preds.get(m.id);
 
-    if (home && away && kickoff > now) {
+    if (home && away && isOpenForPrediction(kickoff, nowDate)) {
       editable.push({
         id: m.id,
-        dayLabel: madridDayLabel(new Date(m.kickoff)),
-        time: madridTime(new Date(m.kickoff)),
+        dayLabel: madridDayLabel(kickoff),
+        time: madridTime(kickoff),
         stageLabel: stageShort(m),
         homeFlag: home.flag,
         homeName: home.name,
@@ -37,30 +39,65 @@ export default async function PredictPage() {
         predHome: pred?.homeScore ?? null,
         predAway: pred?.awayScore ?? null,
       });
-    } else if (kickoff <= now && home && away) {
+    } else if (kickoff.getTime() <= now && home && away) {
       past.push({ m, home, away, pred });
+    } else if (home && away) {
+      // Future day — visible but not open until its 09:00 release.
+      upcoming.push({ m, home, away, opensAt: predictionOpensAt(kickoff) });
     }
   }
 
   // Most recent first for the history list.
   past.reverse();
+  upcoming.sort((a, b) => new Date(a.m.kickoff).getTime() - new Date(b.m.kickoff).getTime());
 
   return (
     <div className="space-y-6">
       <div className="card p-4">
         <h1 className="text-lg font-bold text-pitch">My Predictions</h1>
         <p className="text-sm text-slate-500">
-          Predict the scoreline of every upcoming match. Predictions lock at kick-off (Madrid time).
-          Exact score = <strong>3 pts</strong>, correct winner/draw = <strong>1 pt</strong>.
+          Each day at 09:00 (Madrid) that day&apos;s matches open for predictions — you can only
+          predict today&apos;s games. Predictions lock at kick-off. Exact score ={" "}
+          <strong>3 pts</strong>, correct winner/draw = <strong>1 pt</strong>.
         </p>
       </div>
 
       <section>
         <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">
-          Open for predictions
+          Open today
         </h2>
         <PredictForm matches={editable} />
       </section>
+
+      {upcoming.length > 0 && (
+        <section>
+          <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">
+            Opens later
+          </h2>
+          <div className="card divide-y divide-slate-100">
+            {upcoming.map(({ m, home, away, opensAt }) => (
+              <div key={m.id} className="flex items-center gap-3 px-4 py-3 text-sm">
+                <div className="w-16 shrink-0 text-xs text-slate-400">
+                  {madridDayLabel(new Date(m.kickoff))} {madridTime(new Date(m.kickoff))}
+                  <div className="text-[10px] uppercase">{stageLabel(m)}</div>
+                </div>
+                <div className="flex flex-1 items-center justify-center gap-2 text-slate-500">
+                  <span className="text-right font-medium">
+                    {home.flag} {home.name}
+                  </span>
+                  <span className="text-slate-300">v</span>
+                  <span className="font-medium">
+                    {away.name} {away.flag}
+                  </span>
+                </div>
+                <div className="w-28 shrink-0 text-right text-xs text-slate-400">
+                  🔒 opens {madridDayLabel(opensAt)} 09:00
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {past.length > 0 && (
         <section>

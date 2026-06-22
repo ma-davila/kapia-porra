@@ -4,6 +4,7 @@ import { getDb } from "@/lib/db";
 import { predictions } from "@/lib/schema";
 import { getAllMatches } from "@/lib/standings";
 import { requireUser } from "@/lib/guard";
+import { isOpenForPrediction } from "@/lib/dates";
 import { revalidatePath } from "next/cache";
 
 export type SaveState = { saved?: number; error?: string };
@@ -16,7 +17,7 @@ export async function savePredictions(
   const db = getDb();
   const all = await getAllMatches();
   const byId = new Map(all.map((m) => [m.id, m]));
-  const now = Date.now();
+  const now = new Date();
 
   let saved = 0;
   // Inputs come as home-<id> / away-<id>.
@@ -29,9 +30,9 @@ export async function savePredictions(
   for (const id of ids) {
     const match = byId.get(id);
     if (!match) continue;
-    // Editable only if both teams known and not yet kicked off.
+    // Editable only if both teams known and the match is in today's open slate.
     if (!match.homeCode || !match.awayCode) continue;
-    if (new Date(match.kickoff).getTime() <= now) continue;
+    if (!isOpenForPrediction(new Date(match.kickoff), now)) continue;
 
     const hRaw = String(formData.get(`home-${id}`) ?? "").trim();
     const aRaw = String(formData.get(`away-${id}`) ?? "").trim();

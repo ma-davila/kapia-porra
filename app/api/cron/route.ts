@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { updateResultsFromApi } from "@/lib/update";
-import { getDigestByDate, getDigestRecent } from "@/lib/standings";
+import { getDigestByDate, getDailyDigest } from "@/lib/standings";
 import { buildDigestText, postToSlack } from "@/lib/slack";
 
 export const dynamic = "force-dynamic";
@@ -33,8 +33,8 @@ async function run(req: Request) {
     result.syncError = String(e);
   }
 
-  // 2. Build the digest (specific Madrid date, or last 24h by default).
-  const digest = date ? await getDigestByDate(date) : await getDigestRecent(24);
+  // 2. Build the digest (specific Madrid date, or the daily 9am slate by default).
+  const digest = date ? await getDigestByDate(date) : await getDailyDigest();
   result.matches = digest.dayMatches.length;
   result.players = digest.leaderboard.length;
 

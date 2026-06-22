@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { getDb } from "@/lib/db";
 import { matches } from "@/lib/schema";
-import { getAllMatches, regradeAll, getDigestByDate, getDigestRecent } from "@/lib/standings";
+import { getAllMatches, regradeAll, getDigestByDate, getDailyDigest } from "@/lib/standings";
 import { updateResultsFromApi } from "@/lib/update";
 import { buildDigestText, postToSlack } from "@/lib/slack";
 import { setAdminCookie, isAdmin, clearAdminCookie } from "@/lib/session";
@@ -90,7 +90,7 @@ export async function adminSendDigest(_prev: AdminMsg, formData: FormData): Prom
   await ensureAdmin();
   const date = String(formData.get("date") ?? "").trim();
   try {
-    const digest = date ? await getDigestByDate(date) : await getDigestRecent(24);
+    const digest = date ? await getDigestByDate(date) : await getDailyDigest();
     if (!process.env.SLACK_WEBHOOK_URL) {
       return { error: "SLACK_WEBHOOK_URL is not set." };
     }

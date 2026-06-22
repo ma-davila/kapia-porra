@@ -3,7 +3,7 @@ import { getDb } from "./db";
 import { matches, predictions, teams, users } from "./schema";
 import type { Match, Team } from "./schema";
 import { scorePrediction, isExact } from "./scoring";
-import { madridDateStr } from "./dates";
+import { madridDateStr, predictionWindow } from "./dates";
 
 export async function getTeams(): Promise<Map<string, Team>> {
   const db = getDb();
@@ -159,44 +159,55 @@ export type DigestUser = { name: string; dayPoints: number; exact: number };
 
 export type Digest = {
   title: string;
-  dayMatches: DigestMatch[];
+  dayMatches: DigestMatch[]; // results to report (yesterday's slate)
+  upcoming: DigestMatch[]; // today's matches, still open to predict
   perUser: DigestUser[];
   leaderboard: LeaderRow[];
 };
 
-// Digest for all finished matches whose kickoff (Madrid date) matches dateStr.
-export async function getDigestByDate(dateStr: string): Promise<Digest> {
-  return buildDigest(
-    (m) => madridDateStr(new Date(m.kickoff)) === dateStr,
-    dateStr,
-  );
+// The daily digest used by the cron: yesterday's results + today's open matches.
+export async function getDailyDigest(now = new Date()): Promise<Digest> {
+  const w = predictionWindow(now);
+  const prevStart = new Date(w.start.getTime() - 24 * 3600000);
+  const inResults = (m: Match) => {
+    const k = new Date(m.kickoff).getTime();
+    return k >= prevStart.getTime() && k < w.start.getTime();
+  };
+  const inToday = (m: Match) => {
+    const k = new Date(m.kickoff).getTime();
+    return k >= w.start.getTime() && k < w.end.getTime();
+  };
+  return buildDigest(inResults, inToday, "Latest results");
 }
 
-// Digest for matches finished in the last `hours` (default 24h) — used by the cron.
-export async function getDigestRecent(hours = 24): Promise<Digest> {
-  const cutoff = Date.now() - hours * 3600000;
-  return buildDigest(
-    (m) => new Date(m.kickoff).getTime() >= cutoff,
-    "Latest results",
-  );
+// Admin-only: digest centred on a specific Madrid calendar day.
+export async function getDigestByDate(dateStr: string): Promise<Digest> {
+  const sameDay = (m: Match) => madridDateStr(new Date(m.kickoff)) === dateStr;
+  return buildDigest(sameDay, sameDay, dateStr);
 }
 
 async function buildDigest(
-  filter: (m: Match) => boolean,
+  resultsFilter: (m: Match) => boolean,
+  todayFilter: (m: Match) => boolean,
   title: string,
 ): Promise<Digest> {
   const db = getDb();
   const teamMap = await getTeams();
   const all = await getAllMatches();
+  const withTeams = (m: Match): DigestMatch => ({
+    match: m,
+    home: m.homeCode ? teamMap.get(m.homeCode) ?? null : null,
+    away: m.awayCode ? teamMap.get(m.awayCode) ?? null : null,
+  });
 
   const dayMatches = all.filter(
-    (m) =>
-      m.status === "finished" &&
-      m.homeScore != null &&
-      m.awayScore != null &&
-      filter(m),
+    (m) => m.status === "finished" && m.homeScore != null && m.awayScore != null && resultsFilter(m),
   );
   const dayIds = new Set(dayMatches.map((m) => m.id));
+
+  const upcoming = all.filter(
+    (m) => m.status === "scheduled" && m.homeCode && m.awayCode && todayFilter(m),
+  );
 
   const us = await db.select().from(users);
   const preds = await db.select().from(predictions);
@@ -213,16 +224,13 @@ async function buildDigest(
   }
 
   const perUser = [...perUserMap.values()]
-    .filter((u) => userById.size > 0)
+    .filter(() => userById.size > 0)
     .sort((a, b) => b.dayPoints - a.dayPoints || b.exact - a.exact || a.name.localeCompare(b.name));
 
   return {
     title,
-    dayMatches: dayMatches.map((m) => ({
-      match: m,
-      home: m.homeCode ? teamMap.get(m.homeCode) ?? null : null,
-      away: m.awayCode ? teamMap.get(m.awayCode) ?? null : null,
-    })),
+    dayMatches: dayMatches.map(withTeams),
+    upcoming: upcoming.map(withTeams),
     perUser,
     leaderboard: await getLeaderboard(),
   };

@@ -17,6 +17,7 @@ import {
 } from "../lib/standings";
 import { buildDigestText } from "../lib/slack";
 import { scorePrediction } from "../lib/scoring";
+import { isOpenForPrediction, predictionWindow } from "../lib/dates";
 import { codeForName, type ApiResult } from "../lib/football";
 import { updateResultsFromApi, computeUpdates } from "../lib/update";
 
@@ -195,6 +196,29 @@ async function main() {
   const koFar = computeUpdates(all, [apiKoFar]);
   const boundToR32 = koFar.some((u) => u.id === r32.id);
   check("far-off fixture not bound to this slot", !boundToR32);
+
+  console.log("\n[11] Daily prediction window (09:00 Madrid anchor)");
+  const mon14 = new Date("2026-06-22T12:00:00Z"); // Madrid 14:00 Mon
+  const w = predictionWindow(mon14);
+  check("window starts 07:00Z (09:00 Madrid CEST)", w.start.toISOString() === "2026-06-22T07:00:00.000Z", w.start.toISOString());
+  check(
+    "today's evening match is open",
+    isOpenForPrediction(new Date("2026-06-22T19:00:00Z"), mon14),
+  );
+  check(
+    "tomorrow's match is NOT open today",
+    !isOpenForPrediction(new Date("2026-06-23T19:00:00Z"), mon14),
+  );
+  check(
+    "already-started match is NOT open",
+    !isOpenForPrediction(new Date("2026-06-22T06:00:00Z"), mon14),
+  );
+  // Late at night (Madrid 01:00) the post-midnight match of the same slate is still open.
+  const lateNight = new Date("2026-06-21T23:00:00Z"); // Madrid 01:00 Jun22
+  check(
+    "post-midnight match still open before its kickoff",
+    isOpenForPrediction(new Date("2026-06-22T02:00:00Z"), lateNight),
+  );
 
   console.log("\n--- Slack digest preview ---\n");
   console.log(text);

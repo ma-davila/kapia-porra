@@ -1,11 +1,20 @@
 import type { Digest } from "./standings";
+import { madridTime } from "./dates";
 
 function medal(i: number): string {
   return ["🥇", "🥈", "🥉"][i] ?? `${i + 1}.`;
 }
 
+// Public base URL of the app, for links in the Slack message.
+export function appBaseUrl(): string | null {
+  if (process.env.APP_URL) return process.env.APP_URL.replace(/\/$/, "");
+  const v = process.env.VERCEL_PROJECT_PRODUCTION_URL || process.env.VERCEL_URL;
+  return v ? `https://${v}` : null;
+}
+
 export function buildDigestText(opts: Digest): string {
-  const { dayMatches, perUser, leaderboard } = opts;
+  const { dayMatches, upcoming, perUser, leaderboard } = opts;
+  const base = appBaseUrl();
 
   const lines: string[] = [];
   lines.push(`⚽ *Kapia's World Cup Porra — ${opts.title}*`);
@@ -41,6 +50,23 @@ export function buildDigestText(opts: Digest): string {
     leaderboard.forEach((r, i) => {
       lines.push(`${medal(i)} ${r.name} — *${r.points}* pts (${r.exact} exact)`);
     });
+  }
+
+  // Today's matches — still open to predict.
+  lines.push("");
+  if (upcoming.length === 0) {
+    lines.push("_No more matches to predict today._");
+  } else {
+    lines.push("*📋 Today's matches — predict before kick-off:*");
+    for (const dm of upcoming) {
+      const h = dm.home ? `${dm.home.flag} ${dm.home.name}` : dm.match.homeLabel ?? "?";
+      const a = dm.away ? `${dm.away.name} ${dm.away.flag}` : dm.match.awayLabel ?? "?";
+      lines.push(`• ${madridTime(new Date(dm.match.kickoff))}  ${h} v ${a}`);
+    }
+    if (base) {
+      lines.push("");
+      lines.push(`👉 Make your predictions: ${base}/predict`);
+    }
   }
 
   return lines.join("\n");
