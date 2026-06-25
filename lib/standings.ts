@@ -91,6 +91,7 @@ export async function getGroupStandings(): Promise<
 export type LeaderRow = {
   userId: number;
   name: string;
+  slackId: string | null;
   points: number;
   exact: number;
   correct: number;
@@ -104,7 +105,15 @@ export async function getLeaderboard(): Promise<LeaderRow[]> {
 
   const byUser = new Map<number, LeaderRow>();
   for (const u of us) {
-    byUser.set(u.id, { userId: u.id, name: u.name, points: 0, exact: 0, correct: 0, played: 0 });
+    byUser.set(u.id, {
+      userId: u.id,
+      name: u.name,
+      slackId: u.slackId,
+      points: 0,
+      exact: 0,
+      correct: 0,
+      played: 0,
+    });
   }
   for (const p of preds) {
     const row = byUser.get(p.userId);
@@ -155,7 +164,7 @@ export type DigestMatch = {
   home: Team | null;
   away: Team | null;
 };
-export type DigestUser = { name: string; dayPoints: number; exact: number };
+export type DigestUser = { name: string; slackId: string | null; dayPoints: number; exact: number };
 
 export type Digest = {
   title: string;
@@ -214,7 +223,7 @@ async function buildDigest(
   const userById = new Map(us.map((u) => [u.id, u.name]));
 
   const perUserMap = new Map<number, DigestUser>();
-  for (const u of us) perUserMap.set(u.id, { name: u.name, dayPoints: 0, exact: 0 });
+  for (const u of us) perUserMap.set(u.id, { name: u.name, slackId: u.slackId, dayPoints: 0, exact: 0 });
   for (const p of preds) {
     if (!dayIds.has(p.matchId) || p.points == null) continue;
     const row = perUserMap.get(p.userId);

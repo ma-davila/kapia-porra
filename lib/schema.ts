@@ -20,6 +20,7 @@ export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   name: text("name").notNull().unique(),
   passwordHash: text("password_hash").notNull(),
+  slackId: text("slack_id"), // Slack member ID (e.g. U0123ABCD) for @-mentions
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 

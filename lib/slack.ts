@@ -5,6 +5,12 @@ function medal(i: number): string {
   return ["🥇", "🥈", "🥉"][i] ?? `${i + 1}.`;
 }
 
+// Render a player as a Slack @-mention if they've set their member ID, else
+// just their name.
+function who(p: { name: string; slackId: string | null }): string {
+  return p.slackId ? `<@${p.slackId}>` : p.name;
+}
+
 // Public base URL of the app, for links in the Slack message.
 export function appBaseUrl(): string | null {
   if (process.env.APP_URL) return process.env.APP_URL.replace(/\/$/, "");
@@ -37,7 +43,7 @@ export function buildDigestText(opts: Digest): string {
     } else {
       for (const u of scored) {
         const ex = u.exact > 0 ? ` (${u.exact} exact)` : "";
-        lines.push(`• ${u.name}: *${u.dayPoints}* pts${ex}`);
+        lines.push(`• ${who(u)}: *${u.dayPoints}* pts${ex}`);
       }
     }
   }

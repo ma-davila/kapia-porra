@@ -41,6 +41,19 @@ export default function LoginForm() {
           placeholder="Kapia invite code"
         />
       </div>
+      <div>
+        <label className="mb-1 block text-sm font-medium text-slate-700">
+          Slack member ID <span className="font-normal text-slate-400">(optional)</span>
+        </label>
+        <input
+          name="slackId"
+          className="w-full rounded-lg border border-slate-300 px-3 py-2 focus:border-kapia focus:outline-none focus:ring-1 focus:ring-kapia"
+          placeholder="U0123ABCD — so the Slack digest @-mentions you"
+        />
+        <p className="mt-1 text-xs text-slate-400">
+          In Slack: your profile → ⋮ More → Copy member ID. You can also add it later in Settings.
+        </p>
+      </div>
 
       {state.error && (
         <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{state.error}</p>

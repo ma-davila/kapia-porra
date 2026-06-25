@@ -8,6 +8,7 @@ const links = [
   { href: "/predict", label: "My Predictions" },
   { href: "/bracket", label: "Bracket" },
   { href: "/leaderboard", label: "Leaderboard" },
+  { href: "/settings", label: "Settings" },
 ];
 
 export default async function Nav() {

@@ -92,6 +92,13 @@ the real qualified teams, the daily sync **fills each bracket slot automatically
 fixtures to slots by kick-off time) and then grades scores like any other match. You don't
 need to touch anything — `/admin` is only a manual fallback if a fixture ever fails to map.
 
+## Slack @-mentions
+
+Players can paste their **Slack member ID** (Slack → profile → ⋮ More → *Copy member ID*,
+looks like `U0123ABCD`) on the login screen or under **Settings**. When they earn points that
+day, the Slack digest pings them with a real `@mention` instead of plain text. No extra Slack
+setup or bot token needed — it works through the same incoming webhook.
+
 ## Notes
 
 - Predictions lock automatically at each match's kick-off (Madrid time).

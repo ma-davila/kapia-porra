@@ -18,6 +18,7 @@ import {
 import { buildDigestText } from "../lib/slack";
 import { scorePrediction } from "../lib/scoring";
 import { isOpenForPrediction, predictionWindow } from "../lib/dates";
+import { normalizeSlackId } from "../lib/auth";
 import { codeForName, type ApiResult } from "../lib/football";
 import { updateResultsFromApi, computeUpdates } from "../lib/update";
 
@@ -38,7 +39,7 @@ async function main() {
 
   await client.exec(`
     CREATE TABLE teams (code text PRIMARY KEY, name text NOT NULL, flag text NOT NULL, group_letter text);
-    CREATE TABLE users (id serial PRIMARY KEY, name text NOT NULL UNIQUE, password_hash text NOT NULL, created_at timestamptz NOT NULL DEFAULT now());
+    CREATE TABLE users (id serial PRIMARY KEY, name text NOT NULL UNIQUE, password_hash text NOT NULL, slack_id text, created_at timestamptz NOT NULL DEFAULT now());
     CREATE TABLE matches (
       id integer PRIMARY KEY, stage text NOT NULL, group_letter text, matchday integer,
       home_code text, away_code text, home_label text, away_label text,
@@ -219,6 +220,32 @@ async function main() {
     "post-midnight match still open before its kickoff",
     isOpenForPrediction(new Date("2026-06-22T02:00:00Z"), lateNight),
   );
+
+  console.log("\n[12] Slack member ID + @-mentions");
+  check("plain id kept", normalizeSlackId("U0123ABCD") === "U0123ABCD");
+  check("pasted <@id> parsed", normalizeSlackId("<@U0123ABCD>") === "U0123ABCD");
+  check("pasted <@id|name> parsed", normalizeSlackId("<@U0123ABCD|miguel>") === "U0123ABCD");
+  check("blank -> null", normalizeSlackId("  ") === null);
+  check("garbage -> null", normalizeSlackId("hello") === null);
+  const fakeDigest = {
+    title: "t",
+    dayMatches: [
+      {
+        match: { homeScore: 2, awayScore: 1, homeLabel: null, awayLabel: null },
+        home: { flag: "🇪🇸", name: "Spain" },
+        away: { flag: "🇵🇹", name: "Portugal" },
+      },
+    ],
+    upcoming: [],
+    perUser: [
+      { name: "Ana", slackId: "U999AAA", dayPoints: 3, exact: 1 },
+      { name: "Bob", slackId: null, dayPoints: 1, exact: 0 },
+    ],
+    leaderboard: [],
+  } as any;
+  const mtext = buildDigestText(fakeDigest);
+  check("mentions player who set a Slack ID", mtext.includes("<@U999AAA>"));
+  check("plain name for player without Slack ID", /•\sBob:/.test(mtext));
 
   console.log("\n--- Slack digest preview ---\n");
   console.log(text);
