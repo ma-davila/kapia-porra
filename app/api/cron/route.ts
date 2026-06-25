@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { updateResultsFromApi } from "@/lib/update";
-import { getDigestByDate, getDailyDigest } from "@/lib/standings";
-import { buildDigestText, postToSlack } from "@/lib/slack";
+import { getDigestByDate, getDailyDigest, getMissingPredictors } from "@/lib/standings";
+import { buildDigestText, buildReminderText, postToSlack } from "@/lib/slack";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -21,8 +21,11 @@ async function run(req: Request) {
   }
 
   const url = new URL(req.url);
+  const mode = url.searchParams.get("mode"); // "remind" for the 5pm nudge
   const date = url.searchParams.get("date"); // YYYY-MM-DD (Madrid), optional
   const dry = url.searchParams.get("dry") === "1"; // skip Slack post
+
+  if (mode === "remind") return runReminder(url, dry);
 
   const result: Record<string, unknown> = {};
 
@@ -56,6 +59,35 @@ async function run(req: Request) {
   }
 
   return NextResponse.json({ ok: true, ...result });
+}
+
+// 5pm nudge: ping players who haven't predicted today's still-open matches.
+// Sends nothing if nobody is missing.
+async function runReminder(url: URL, dry: boolean) {
+  const { openMatchIds, missing } = await getMissingPredictors();
+  const base: Record<string, unknown> = {
+    ok: true,
+    mode: "remind",
+    openMatches: openMatchIds.length,
+    missing: missing.length,
+  };
+
+  if (missing.length === 0) {
+    return NextResponse.json({ ...base, slack: "skipped (nobody missing)" });
+  }
+
+  const text = buildReminderText(missing, openMatchIds.length);
+  if (dry) return NextResponse.json({ ...base, slack: "dry-run", preview: text });
+
+  try {
+    if (process.env.SLACK_WEBHOOK_URL) {
+      await postToSlack(text);
+      return NextResponse.json({ ...base, slack: "posted" });
+    }
+    return NextResponse.json({ ...base, slack: "skipped (no SLACK_WEBHOOK_URL)" });
+  } catch (e) {
+    return NextResponse.json({ ...base, slackError: String(e) });
+  }
 }
 
 export async function GET(req: Request) {

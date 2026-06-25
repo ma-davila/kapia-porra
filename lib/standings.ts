@@ -174,6 +174,35 @@ export type Digest = {
   leaderboard: LeaderRow[];
 };
 
+// Players who still have at least one of today's still-open matches without a
+// prediction. Returns the open match ids and the list of laggards.
+export async function getMissingPredictors(
+  now = new Date(),
+): Promise<{ openMatchIds: number[]; missing: { name: string; slackId: string | null }[] }> {
+  const all = await getAllMatches();
+  const w = predictionWindow(now);
+  const openIds = all
+    .filter((m) => {
+      if (m.status !== "scheduled" || !m.homeCode || !m.awayCode) return false;
+      const k = new Date(m.kickoff).getTime();
+      return k >= w.start.getTime() && k < w.end.getTime() && k > now.getTime();
+    })
+    .map((m) => m.id);
+
+  if (openIds.length === 0) return { openMatchIds: [], missing: [] };
+
+  const db = getDb();
+  const us = await db.select().from(users);
+  const preds = await db.select().from(predictions);
+  const predSet = new Set(preds.map((p) => `${p.userId}-${p.matchId}`));
+
+  const missing = us
+    .filter((u) => openIds.some((id) => !predSet.has(`${u.id}-${id}`)))
+    .map((u) => ({ name: u.name, slackId: u.slackId }));
+
+  return { openMatchIds: openIds, missing };
+}
+
 // The daily digest used by the cron: yesterday's results + today's open matches.
 export async function getDailyDigest(now = new Date()): Promise<Digest> {
   const w = predictionWindow(now);

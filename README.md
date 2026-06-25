@@ -54,9 +54,11 @@ password, enters the invite code once, and starts predicting.
 
 ## How it runs day to day
 
-- **Cron `/api/cron`** (daily, automatic): fetches recent scores from football-data.org,
+- **Cron `/api/cron`** (daily ~09:00 Madrid): fetches recent scores from football-data.org,
   updates matches, regrades predictions, and posts the Slack digest (yesterday's results +
-  points each person earned + overall standings).
+  points each person earned + overall standings + today's matches to predict).
+- **Cron `/api/cron?mode=remind`** (daily ~17:00 Madrid): a "last call" that pings the players
+  who still haven't predicted today's open matches. Sends nothing if nobody is missing.
 - **`/admin`** (password-protected, optional fallback): manually fix a score, override a
   knockout team assignment, trigger a results sync on demand, or re-post the Slack digest
   for a chosen date. Day to day you shouldn't need it.

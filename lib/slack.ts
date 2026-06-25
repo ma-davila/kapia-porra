@@ -78,6 +78,27 @@ export function buildDigestText(opts: Digest): string {
   return lines.join("\n");
 }
 
+// "Last call" reminder pinging players who haven't predicted today's still-open
+// matches. Players with a Slack ID get an @-mention; others show their name.
+export function buildReminderText(
+  missing: { name: string; slackId: string | null }[],
+  openCount: number,
+): string {
+  const base = appBaseUrl();
+  const lines: string[] = [];
+  lines.push("⏰ *Kapia's World Cup Porra — last call!*");
+  lines.push("");
+  lines.push(
+    `${openCount} match${openCount === 1 ? "" : "es"} still open today, and you haven't predicted yet:`,
+  );
+  lines.push(missing.map(who).join("  "));
+  if (base) {
+    lines.push("");
+    lines.push(`👉 Predict before kick-off: ${base}/predict`);
+  }
+  return lines.join("\n");
+}
+
 export async function postToSlack(text: string): Promise<void> {
   const url = process.env.SLACK_WEBHOOK_URL;
   if (!url) throw new Error("SLACK_WEBHOOK_URL is not set");

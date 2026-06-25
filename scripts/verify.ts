@@ -14,8 +14,9 @@ import {
   regradeAll,
   getDigestByDate,
   getAllMatches,
+  getMissingPredictors,
 } from "../lib/standings";
-import { buildDigestText } from "../lib/slack";
+import { buildDigestText, buildReminderText } from "../lib/slack";
 import { scorePrediction } from "../lib/scoring";
 import { isOpenForPrediction, predictionWindow } from "../lib/dates";
 import { normalizeSlackId } from "../lib/auth";
@@ -246,6 +247,24 @@ async function main() {
   const mtext = buildDigestText(fakeDigest);
   check("mentions player who set a Slack ID", mtext.includes("<@U999AAA>"));
   check("plain name for player without Slack ID", /•\sBob:/.test(mtext));
+
+  console.log("\n[13] 5pm reminder: missing predictors");
+  const remindNow = new Date("2026-06-23T10:00:00Z"); // morning of a match day
+  const mp1 = await getMissingPredictors(remindNow);
+  check("there are open matches that day", mp1.openMatchIds.length > 0, `open=${mp1.openMatchIds.length}`);
+  check("player with no bets is flagged missing", mp1.missing.some((m) => m.name === "Test Player"));
+  // Now predict all open matches for the player → should no longer be missing.
+  await db
+    .insert(predictions)
+    .values(mp1.openMatchIds.map((id) => ({ userId: user.id, matchId: id, homeScore: 1, awayScore: 0 })))
+    .onConflictDoNothing();
+  const mp2 = await getMissingPredictors(remindNow);
+  check("player no longer missing after predicting all", !mp2.missing.some((m) => m.name === "Test Player"));
+  const rtext = buildReminderText(
+    [{ name: "Ana", slackId: "U999AAA" }, { name: "Bob", slackId: null }],
+    3,
+  );
+  check("reminder pings slack id + shows plain name", rtext.includes("<@U999AAA>") && rtext.includes("Bob"));
 
   console.log("\n--- Slack digest preview ---\n");
   console.log(text);
