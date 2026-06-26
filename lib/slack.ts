@@ -1,4 +1,4 @@
-import type { Digest } from "./standings";
+import type { Digest, BreakdownUser } from "./standings";
 import { madridTime } from "./dates";
 
 function medal(i: number): string {
@@ -99,15 +99,81 @@ export function buildReminderText(
   return lines.join("\n");
 }
 
-export async function postToSlack(text: string): Promise<void> {
+// Threaded breakdown reply: who hit what yesterday, ranked by points, successes
+// only. Posted as a reply under the morning digest.
+export function buildBreakdownText(breakdown: BreakdownUser[]): string {
+  const lines: string[] = [];
+  lines.push("🧵 *Yesterday's hits — who nailed it:*");
+  breakdown.forEach((b, i) => {
+    lines.push("");
+    lines.push(`${medal(i)} ${who(b)} — *${b.dayPoints}* pts`);
+    for (const h of b.hits) {
+      if (h.kind === "exact") {
+        lines.push(`   ✅ exact score: ${h.home} ${h.homeScore}–${h.awayScore} ${h.away}`);
+      } else {
+        const verb =
+          h.homeScore > h.awayScore
+            ? `called ${h.home} to win`
+            : h.homeScore < h.awayScore
+              ? `called ${h.away} to win`
+              : `called the draw (${h.home} vs ${h.away})`;
+        lines.push(`   👍 ${verb}`);
+      }
+    }
+  });
+  return lines.join("\n");
+}
+
+function hasSlack(): boolean {
+  return Boolean(
+    process.env.SLACK_WEBHOOK_URL ||
+      (process.env.SLACK_BOT_TOKEN && process.env.SLACK_CHANNEL_ID),
+  );
+}
+
+// Low-level post. Uses the Slack Web API (bot token) when configured — which
+// supports threaded replies and returns the message ts — otherwise falls back
+// to the incoming webhook (no threading, returns null).
+async function slackPost(text: string, threadTs?: string): Promise<string | null> {
+  const token = process.env.SLACK_BOT_TOKEN;
+  const channel = process.env.SLACK_CHANNEL_ID;
+  if (token && channel) {
+    const res = await fetch("https://slack.com/api/chat.postMessage", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json; charset=utf-8",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ channel, text, thread_ts: threadTs, unfurl_links: false }),
+    });
+    const data = (await res.json()) as { ok: boolean; ts?: string; error?: string };
+    if (!data.ok) throw new Error(`Slack chat.postMessage: ${data.error}`);
+    return data.ts ?? null;
+  }
+
   const url = process.env.SLACK_WEBHOOK_URL;
-  if (!url) throw new Error("SLACK_WEBHOOK_URL is not set");
+  if (!url) throw new Error("No Slack config (set SLACK_BOT_TOKEN+SLACK_CHANNEL_ID or SLACK_WEBHOOK_URL)");
   const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ text }),
   });
-  if (!res.ok) {
-    throw new Error(`Slack webhook ${res.status}: ${await res.text()}`);
-  }
+  if (!res.ok) throw new Error(`Slack webhook ${res.status}: ${await res.text()}`);
+  return null;
 }
+
+// Post the digest, and (if there were any hits) attach the breakdown as a
+// threaded reply. Threading needs a bot token: slackPost returns the message ts
+// only via the Web API. With only a webhook, we skip the breakdown to avoid
+// posting it as a separate, clutter-y top-level message.
+export async function postDigest(mainText: string, breakdownText: string | null): Promise<void> {
+  const ts = await slackPost(mainText);
+  if (breakdownText && ts) await slackPost(breakdownText, ts);
+}
+
+// Single-message post (used by the reminder).
+export async function postToSlack(text: string): Promise<void> {
+  await slackPost(text);
+}
+
+export { hasSlack };

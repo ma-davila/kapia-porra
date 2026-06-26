@@ -16,7 +16,7 @@ import {
   getAllMatches,
   getMissingPredictors,
 } from "../lib/standings";
-import { buildDigestText, buildReminderText } from "../lib/slack";
+import { buildDigestText, buildReminderText, buildBreakdownText } from "../lib/slack";
 import { scorePrediction } from "../lib/scoring";
 import { isOpenForPrediction, predictionWindow } from "../lib/dates";
 import { normalizeSlackId } from "../lib/auth";
@@ -269,6 +269,28 @@ async function main() {
     3,
   );
   check("reminder pings slack id + shows plain name", rtext.includes("<@U999AAA>") && rtext.includes("Bob"));
+
+  console.log("\n[14] Threaded breakdown (hits only, ranked)");
+  const bdText = buildBreakdownText([
+    {
+      name: "Ana",
+      slackId: "U999AAA",
+      dayPoints: 4,
+      hits: [
+        { kind: "exact", home: "🇪🇸 Spain", away: "Portugal 🇵🇹", homeScore: 2, awayScore: 1 },
+        { kind: "outcome", home: "🇧🇷 Brazil", away: "Chile 🇨🇱", homeScore: 3, awayScore: 0 },
+      ],
+    },
+    { name: "Bob", slackId: null, dayPoints: 1, hits: [{ kind: "outcome", home: "🇫🇷 France", away: "Iraq 🇮🇶", homeScore: 0, awayScore: 0 }] },
+  ]);
+  check("breakdown ranks Ana (more pts) first with medal", /🥇\s<@U999AAA>/.test(bdText));
+  check("breakdown shows exact score line", bdText.includes("✅ exact score: 🇪🇸 Spain 2–1 Portugal 🇵🇹"));
+  check("breakdown shows 'called X to win'", bdText.includes("called 🇧🇷 Brazil to win"));
+  check("breakdown shows draw phrasing", bdText.includes("called the draw"));
+  check("breakdown uses plain name without Slack ID", /🥈\sBob/.test(bdText));
+  // From the real DB digest, breakdown shape is present.
+  const realDigest = await getDigestByDate(dateStr);
+  check("digest exposes a breakdown array", Array.isArray(realDigest.breakdown));
 
   console.log("\n--- Slack digest preview ---\n");
   console.log(text);

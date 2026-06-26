@@ -2,7 +2,14 @@ import { NextResponse } from "next/server";
 import { updateResultsFromApi } from "@/lib/update";
 import { retry } from "@/lib/retry";
 import { getDigestByDate, getDailyDigest, getMissingPredictors } from "@/lib/standings";
-import { buildDigestText, buildReminderText, postToSlack } from "@/lib/slack";
+import {
+  buildDigestText,
+  buildBreakdownText,
+  buildReminderText,
+  postDigest,
+  postToSlack,
+  hasSlack,
+} from "@/lib/slack";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -43,21 +50,24 @@ async function run(req: Request) {
   result.matches = digest.dayMatches.length;
   result.players = digest.leaderboard.length;
 
-  // 3. Post to Slack.
+  const mainText = buildDigestText(digest);
+  const breakdownText = digest.breakdown.length > 0 ? buildBreakdownText(digest.breakdown) : null;
+
+  // 3. Post to Slack — digest message + threaded breakdown of yesterday's hits.
   if (!dry) {
     try {
-      if (process.env.SLACK_WEBHOOK_URL) {
-        await postToSlack(buildDigestText(digest));
+      if (hasSlack()) {
+        await postDigest(mainText, breakdownText);
         result.slack = "posted";
       } else {
-        result.slack = "skipped (no SLACK_WEBHOOK_URL)";
+        result.slack = "skipped (no Slack config)";
       }
     } catch (e) {
       result.slackError = String(e);
     }
   } else {
     result.slack = "dry-run";
-    result.preview = buildDigestText(digest);
+    result.preview = mainText + (breakdownText ? `\n\n──── thread reply ────\n${breakdownText}` : "");
   }
 
   return NextResponse.json({ ok: true, ...result });

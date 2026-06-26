@@ -7,7 +7,7 @@ import { getDb } from "@/lib/db";
 import { matches } from "@/lib/schema";
 import { getAllMatches, regradeAll, getDigestByDate, getDailyDigest } from "@/lib/standings";
 import { updateResultsFromApi } from "@/lib/update";
-import { buildDigestText, postToSlack } from "@/lib/slack";
+import { buildDigestText, buildBreakdownText, postDigest, hasSlack } from "@/lib/slack";
 import { setAdminCookie, isAdmin, clearAdminCookie } from "@/lib/session";
 
 export async function adminLogin(_prev: { error?: string }, formData: FormData) {
@@ -91,10 +91,11 @@ export async function adminSendDigest(_prev: AdminMsg, formData: FormData): Prom
   const date = String(formData.get("date") ?? "").trim();
   try {
     const digest = date ? await getDigestByDate(date) : await getDailyDigest();
-    if (!process.env.SLACK_WEBHOOK_URL) {
-      return { error: "SLACK_WEBHOOK_URL is not set." };
+    if (!hasSlack()) {
+      return { error: "No Slack config (set SLACK_BOT_TOKEN+SLACK_CHANNEL_ID or SLACK_WEBHOOK_URL)." };
     }
-    await postToSlack(buildDigestText(digest));
+    const breakdown = digest.breakdown.length > 0 ? buildBreakdownText(digest.breakdown) : null;
+    await postDigest(buildDigestText(digest), breakdown);
     return { ok: `Digest posted to Slack (${digest.dayMatches.length} matches).` };
   } catch (e) {
     return { error: `Slack post failed: ${String(e)}` };

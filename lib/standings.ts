@@ -166,11 +166,27 @@ export type DigestMatch = {
 };
 export type DigestUser = { name: string; slackId: string | null; dayPoints: number; exact: number };
 
+// Per-player hit detail for the threaded breakdown reply.
+export type BreakdownHit = {
+  kind: "exact" | "outcome";
+  home: string; // "🇪🇸 Spain"
+  away: string; // "Portugal 🇵🇹"
+  homeScore: number;
+  awayScore: number;
+};
+export type BreakdownUser = {
+  name: string;
+  slackId: string | null;
+  dayPoints: number;
+  hits: BreakdownHit[];
+};
+
 export type Digest = {
   title: string;
   dayMatches: DigestMatch[]; // results to report (yesterday's slate)
   upcoming: DigestMatch[]; // today's matches, still open to predict
   perUser: DigestUser[];
+  breakdown: BreakdownUser[]; // who hit what yesterday, ranked by points
   leaderboard: LeaderRow[];
 };
 
@@ -251,25 +267,77 @@ async function buildDigest(
   const preds = await db.select().from(predictions);
   const userById = new Map(us.map((u) => [u.id, u.name]));
 
+  // Team labels for the day's results, for the per-hit breakdown.
+  const dayMatchInfo = new Map(
+    dayMatches.map((m) => {
+      const home = m.homeCode ? teamMap.get(m.homeCode) : null;
+      const away = m.awayCode ? teamMap.get(m.awayCode) : null;
+      return [
+        m.id,
+        {
+          home: home ? `${home.flag} ${home.name}` : m.homeLabel ?? "?",
+          away: away ? `${away.name} ${away.flag}` : m.awayLabel ?? "?",
+          homeScore: m.homeScore!,
+          awayScore: m.awayScore!,
+        },
+      ];
+    }),
+  );
+
   const perUserMap = new Map<number, DigestUser>();
-  for (const u of us) perUserMap.set(u.id, { name: u.name, slackId: u.slackId, dayPoints: 0, exact: 0 });
+  const breakdownMap = new Map<number, BreakdownUser>();
+  for (const u of us) {
+    perUserMap.set(u.id, { name: u.name, slackId: u.slackId, dayPoints: 0, exact: 0 });
+    breakdownMap.set(u.id, { name: u.name, slackId: u.slackId, dayPoints: 0, hits: [] });
+  }
   for (const p of preds) {
     if (!dayIds.has(p.matchId) || p.points == null) continue;
     const row = perUserMap.get(p.userId);
-    if (!row) continue;
-    row.dayPoints += p.points;
-    if (p.points === 3) row.exact++;
+    if (row) {
+      row.dayPoints += p.points;
+      if (p.points === 3) row.exact++;
+    }
+    if (p.points > 0) {
+      const bu = breakdownMap.get(p.userId);
+      const info = dayMatchInfo.get(p.matchId);
+      if (bu && info) {
+        bu.dayPoints += p.points;
+        bu.hits.push({
+          kind: p.points === 3 ? "exact" : "outcome",
+          home: info.home,
+          away: info.away,
+          homeScore: info.homeScore,
+          awayScore: info.awayScore,
+        });
+      }
+    }
   }
 
   const perUser = [...perUserMap.values()]
     .filter(() => userById.size > 0)
     .sort((a, b) => b.dayPoints - a.dayPoints || b.exact - a.exact || a.name.localeCompare(b.name));
 
+  const breakdown = [...breakdownMap.values()]
+    .filter((b) => b.hits.length > 0)
+    .map((b) => ({
+      ...b,
+      // exact hits first within each player
+      hits: b.hits.sort((x, y) => (x.kind === y.kind ? 0 : x.kind === "exact" ? -1 : 1)),
+    }))
+    .sort(
+      (a, b) =>
+        b.dayPoints - a.dayPoints ||
+        b.hits.filter((h) => h.kind === "exact").length -
+          a.hits.filter((h) => h.kind === "exact").length ||
+        a.name.localeCompare(b.name),
+    );
+
   return {
     title,
     dayMatches: dayMatches.map(withTeams),
     upcoming: upcoming.map(withTeams),
     perUser,
+    breakdown,
     leaderboard: await getLeaderboard(),
   };
 }

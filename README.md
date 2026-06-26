@@ -101,6 +101,18 @@ looks like `U0123ABCD`) on the login screen or under **Settings**. When they ear
 day, the Slack digest pings them with a real `@mention` instead of plain text. No extra Slack
 setup or bot token needed — it works through the same incoming webhook.
 
+## Threaded "yesterday's hits" reply
+
+If you set a **Slack bot token + channel ID** (instead of the webhook), the morning digest
+also posts a **threaded reply** under itself listing — ranked by points, successes only — who
+nailed exact scores and who called the right winner/draw, mentioning each player.
+
+To enable it: in your Slack app → **OAuth & Permissions** → add the bot scope **`chat:write`**
+→ **Install to Workspace** → copy the **Bot User OAuth Token** (`xoxb-…`) into `SLACK_BOT_TOKEN`.
+Then `/invite` the bot into your channel and put the channel's ID in `SLACK_CHANNEL_ID`
+(channel name → *View channel details* → ID at the bottom). With a bot token set, it's used
+instead of the webhook. Without it, only the digest is posted (no thread).
+
 ## Notes
 
 - Predictions lock automatically at each match's kick-off (Madrid time).
