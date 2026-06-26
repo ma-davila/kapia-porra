@@ -242,11 +242,15 @@ async function main() {
       { name: "Ana", slackId: "U999AAA", dayPoints: 3, exact: 1 },
       { name: "Bob", slackId: null, dayPoints: 1, exact: 0 },
     ],
-    leaderboard: [],
+    leaderboard: [
+      { name: "Ana", slackId: "U999AAA", points: 3, exact: 1 },
+      { name: "Bob", slackId: null, points: 1, exact: 0 },
+    ],
   } as any;
   const mtext = buildDigestText(fakeDigest);
   check("mentions player who set a Slack ID", mtext.includes("<@U999AAA>"));
   check("plain name for player without Slack ID", /•\sBob:/.test(mtext));
+  check("standings also mention by Slack ID", /🥇\s<@U999AAA>/.test(mtext));
 
   console.log("\n[13] 5pm reminder: missing predictors");
   const remindNow = new Date("2026-06-23T10:00:00Z"); // morning of a match day

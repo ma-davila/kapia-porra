@@ -54,7 +54,7 @@ export function buildDigestText(opts: Digest): string {
     lines.push("_No players yet._");
   } else {
     leaderboard.forEach((r, i) => {
-      lines.push(`${medal(i)} ${r.name} — *${r.points}* pts (${r.exact} exact)`);
+      lines.push(`${medal(i)} ${who(r)} — *${r.points}* pts (${r.exact} exact)`);
     });
   }
 
