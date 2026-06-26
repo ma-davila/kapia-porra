@@ -1,6 +1,7 @@
 // Adapter for football-data.org (free tier). Competition "WC" = current World Cup.
 // Docs: https://www.football-data.org/documentation/quickstart
 // Only used by the daily cron to pull real scores; swap this file to change provider.
+import { retry } from "./retry";
 
 export type ApiResult = {
   apiId: number;
@@ -89,14 +90,16 @@ export async function fetchMatches(): Promise<ApiResult[]> {
   const key = process.env.FOOTBALL_API_KEY;
   if (!key) return [];
   const url = `https://api.football-data.org/v4/competitions/WC/matches`;
-  const res = await fetch(url, {
-    headers: { "X-Auth-Token": key },
-    cache: "no-store",
+  const data = await retry(async () => {
+    const res = await fetch(url, {
+      headers: { "X-Auth-Token": key },
+      cache: "no-store",
+    });
+    if (!res.ok) {
+      throw new Error(`football-data.org ${res.status}: ${await res.text()}`);
+    }
+    return (await res.json()) as { matches?: any[] };
   });
-  if (!res.ok) {
-    throw new Error(`football-data.org ${res.status}: ${await res.text()}`);
-  }
-  const data = (await res.json()) as { matches?: any[] };
   const out: ApiResult[] = [];
   for (const m of data.matches ?? []) {
     const stage = String(m.stage ?? "");

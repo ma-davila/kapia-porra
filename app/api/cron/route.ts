@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { updateResultsFromApi } from "@/lib/update";
+import { retry } from "@/lib/retry";
 import { getDigestByDate, getDailyDigest, getMissingPredictors } from "@/lib/standings";
 import { buildDigestText, buildReminderText, postToSlack } from "@/lib/slack";
 
@@ -29,9 +30,10 @@ async function run(req: Request) {
 
   const result: Record<string, unknown> = {};
 
-  // 1. Pull fresh scores from the football API (best effort).
+  // 1. Pull fresh scores from the football API. Retried so a transient failure
+  //    (Neon cold start, API hiccup) doesn't leave the digest with stale data.
   try {
-    result.sync = await updateResultsFromApi();
+    result.sync = await retry(() => updateResultsFromApi());
   } catch (e) {
     result.syncError = String(e);
   }
@@ -64,6 +66,14 @@ async function run(req: Request) {
 // 5pm nudge: ping players who haven't predicted today's still-open matches.
 // Sends nothing if nobody is missing.
 async function runReminder(url: URL, dry: boolean) {
+  // Best-effort results refresh too, so the standings stay current through the
+  // day even if the morning sync hiccuped.
+  try {
+    await retry(() => updateResultsFromApi());
+  } catch {
+    // ignore — the reminder doesn't depend on fresh results
+  }
+
   const { openMatchIds, missing } = await getMissingPredictors();
   const base: Record<string, unknown> = {
     ok: true,
